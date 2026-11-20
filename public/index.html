@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pip — the pet that lives on your signals</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div>
+    <h1>Pip <span class="tagline">— the pet that lives on your signals</span></h1>
+    <p class="sub">Smile, and Pip smiles back. Its heart beats at <em>your</em> pulse. Slow your breathing, and Pip falls asleep.</p>
+  </div>
+  <div id="source-badge" class="badge hidden"></div>
+</header>
+
+<main class="layout">
+  <section class="card stage-card">
+    <div class="stage-wrap">
+      <svg id="pip-svg" viewBox="0 0 320 300" role="img" aria-label="Pip, a small round companion">
+        <ellipse id="pip-glow" cx="160" cy="175" rx="118" ry="100" fill="#ffd9e8" opacity="0.25"></ellipse>
+        <g id="pip-sprout">
+          <path d="M0 6 Q 2 -8 10 -14" stroke="#4d9e6b" stroke-width="4" fill="none" stroke-linecap="round"></path>
+          <path d="M10 -14 q 14 -8 20 2 q -12 10 -20 -2" fill="#63c184"></path>
+        </g>
+        <g id="pip-body-group">
+          <ellipse cx="160" cy="172" rx="96" ry="86" fill="#bfe3ff"></ellipse>
+          <ellipse id="pip-belly" cx="160" cy="196" rx="54" ry="38" fill="#e8f6ff"></ellipse>
+          <path id="pip-heart" d="M160 172 c -3 -10 -16 -14 -22 -6 c -6 8 -2 16 5 22 l17 13 l17 -13 c 7 -6 11 -14 5 -22 c -6 -8 -19 -4 -22 6 z" fill="#ff5d8f"></path>
+          <g id="eye-l" data-cx="128">
+            <ellipse cx="128" cy="128" rx="13" ry="14" fill="#ffffff"></ellipse>
+            <circle cx="128" cy="131" r="6.5" fill="#233044"></circle>
+            <circle cx="130.5" cy="128" r="2.2" fill="#ffffff"></circle>
+          </g>
+          <g id="eye-r" data-cx="192">
+            <ellipse cx="192" cy="128" rx="13" ry="14" fill="#ffffff"></ellipse>
+            <circle cx="192" cy="131" r="6.5" fill="#233044"></circle>
+            <circle cx="194.5" cy="128" r="2.2" fill="#ffffff"></circle>
+          </g>
+          <rect id="lid-l" x="111" y="112" width="34" height="0" rx="8" fill="#bfe3ff"></rect>
+          <rect id="lid-r" x="175" y="112" width="34" height="0" rx="8" fill="#bfe3ff"></rect>
+          <path id="brow-l" d="M -14 0 Q 0 -6 14 0" transform="translate(128 104)" stroke="#233044" stroke-width="4" fill="none" stroke-linecap="round"></path>
+          <path id="brow-r" d="M -14 0 Q 0 -6 14 0" transform="translate(192 104)" stroke="#233044" stroke-width="4" fill="none" stroke-linecap="round"></path>
+          <ellipse id="cheek-l" cx="106" cy="152" rx="11" ry="7" fill="#ff9ebb" opacity="0.18"></ellipse>
+          <ellipse id="cheek-r" cx="214" cy="152" rx="11" ry="7" fill="#ff9ebb" opacity="0.18"></ellipse>
+          <path id="pip-mouth" d="M -11 8 Q 0 13 11 8" transform="translate(160 148)" stroke="#233044" stroke-width="4.5" fill="none" stroke-linecap="round"></path>
+          <ellipse id="pip-mouth-o" cx="160" cy="164" rx="6.5" ry="8.5" fill="#233044" opacity="0"></ellipse>
+        </g>
+        <g id="pip-zzz" opacity="0" font-family="inherit" fill="#7a86a0">
+          <text x="238" y="86" font-size="21" font-weight="700">Z</text>
+          <text x="254" y="66" font-size="16" font-weight="700">z</text>
+          <text x="266" y="50" font-size="12" font-weight="700">z</text>
+        </g>
+      </svg>
+    </div>
+    <p id="mood-line" class="mood">Pip is waiting to meet your signals…</p>
+    <div class="calm-row">
+      <label class="switch">
+        <input type="checkbox" id="calm-toggle">
+        <span>Calm Together — help Pip fall asleep by slowing your breathing</span>
+      </label>
+      <div id="calm-meter-wrap" class="calm-meter hidden" aria-hidden="true">
+        <div id="calm-meter-fill"></div>
+        <span id="calm-meter-label">🌙 0%</span>
+      </div>
+    </div>
+  </section>
+
+  <aside class="side">
+    <section class="card" id="camera-card">
+      <h2>Your camera</h2>
+      <video id="preview" autoplay playsinline muted></video>
+      <p id="camera-note" class="note">The preview is only shown to you, on this device. Frames are measured in memory by the SmartSpectra SDK on this machine — nothing is recorded or uploaded by Pip.</p>
+      <p id="validation-hint" class="hint hidden"></p>
+    </section>
+
+    <section class="card">
+      <h2>Your signals, live</h2>
+      <dl class="signals">
+        <div><dt>💓 Pulse</dt><dd><span id="sig-pulse">—</span> <small>bpm</small> <span class="dot" id="dot-pulse"></span></dd></div>
+        <div><dt>🌬️ Breathing</dt><dd><span id="sig-breathing">—</span> <small>breaths/min</small> <span class="dot" id="dot-breathing"></span></dd></div>
+        <div><dt>🙂 Expression</dt><dd><span id="sig-expression">—</span> <span class="dot" id="dot-expression"></span></dd></div>
+        <div><dt>✨ HRV (RMSSD)</dt><dd><span id="sig-hrv">—</span> <small id="sig-hrv-note">collecting… needs ~60 s of pulse</small></dd></div>
+      </dl>
+      <p class="note">Wellness signals for play and self-awareness — not medical measurements. Numbers only appear when the SDK reports them; dots show its confidence (green = stable).</p>
+    </section>
+
+    <section class="card hidden" id="scenario-card">
+      <h2>Demo puppeteer</h2>
+      <p class="note">Demo mode uses simulated signals. Steer the "person" Pip sees:</p>
+      <div class="scenario-grid">
+        <button data-scenario="smile">😊 Smile</button>
+        <button data-scenario="surprise">😲 Surprise</button>
+        <button data-scenario="sad">😢 Sad</button>
+        <button data-scenario="breathe-slow">🌙 Breathe slowly</button>
+        <button data-scenario="breathe-fast">💨 Breathe fast</button>
+        <button data-scenario="rest">😐 Rest</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <button id="stop-btn" class="danger" disabled>Stop &amp; turn the camera off</button>
+      <p class="note">Stopping ends measurement immediately and releases the camera. Pip keeps nothing — there is no history, account, or database to delete.</p>
+    </section>
+  </aside>
+</main>
+
+<div id="error-banner" class="error-banner hidden" role="alert"></div>
+
+<div id="consent-gate" class="gate" role="dialog" aria-modal="true" aria-labelledby="gate-title">
+  <div class="gate-card">
+    <h2 id="gate-title">Before Pip can see you — your consent</h2>
+    <p>Pip is a small toy with a camera for a heart. Please read this first — nothing is captured until you agree:</p>
+    <ul>
+      <li><strong>What happens:</strong> if you choose live mode, your webcam turns on and the Presage SmartSpectra SDK measures your pulse, breathing, and facial expressions from the video, on this machine, in real time.</li>
+      <li><strong>Nothing is kept:</strong> Pip does not record video, does not take screenshots, and does not store your measurements. Close the tab or press Stop and everything is gone — there is nothing to delete later.</li>
+      <li><strong>Where frames go:</strong> frames are processed in memory by the SDK on this computer. The SDK talks to Presage only to authenticate the API key. Pip's own server (also on this computer) adds no uploads of its own.</li>
+      <li id="telemetry-line"><strong>SDK telemetry:</strong> checking the server setting…</li>
+      <li><strong>Not a medical device:</strong> Pip is for play and gentle self-awareness. It makes no diagnosis, gives no treatment advice, and its numbers are estimates for fun — never health decisions.</li>
+      <li><strong>Your choice, always:</strong> you can stop at any moment. No covert anything — the camera is only ever on while this page says it is.</li>
+    </ul>
+    <div class="gate-actions">
+      <button id="consent-live" class="primary">I agree — turn on my camera</button>
+      <button id="consent-demo">Explore demo mode instead (no camera, simulated signals)</button>
+    </div>
+    <p id="live-unavailable" class="note hidden"></p>
+  </div>
+</div>
+
+<footer>
+  <p>Built with the Presage SmartSpectra SDK (@smartspectra/node-sdk) for the DEV Presage SmartSpectra SDK Challenge. SmartSpectra metrics are for general wellness and informational purposes only and are not cleared for medical diagnosis or treatment.</p>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
