@@ -87,6 +87,8 @@ class LiveSession {
     this.bundleIndex = 0;
     this.gotMetrics = false;
     this.stopping = false;
+    this.framesFed = 0;
+    this.framesRejected = 0;
   }
 
   async start() {
@@ -126,7 +128,9 @@ class LiveSession {
     this.gotMetrics = false;
 
     sdk.on('metrics', (buf) => {
+      if (!this.gotMetrics) console.log('[pip] first metrics event received from the SDK');
       this.gotMetrics = true;
+      this.metricsEvents = (this.metricsEvents ?? 0) + 1;
       let decoded = null;
       try {
         decoded = decodeMetrics(buf);
@@ -134,13 +138,25 @@ class LiveSession {
         decoded = null;
       }
       const frame = normalizeMetrics(decoded);
+      if (this.metricsEvents <= 3 || this.metricsEvents % 30 === 0) {
+        const n = (a) => (Array.isArray(a) ? a.length : 0);
+        console.log(
+          `[pip] metrics #${this.metricsEvents}: raw samples pulse=${n(decoded?.cardio?.pulseRate)} ` +
+            `breathing=${n(decoded?.breathing?.rate)} expression=${n(decoded?.face?.expression)} ` +
+            `landmarks=${n(decoded?.face?.landmarks)} -> page: pulse=${frame?.pulse?.value ?? '-'} ` +
+            `breathing=${frame?.breathing?.value ?? '-'} expression=${frame?.expression?.dominant ?? '-'}`,
+        );
+      }
       if (frame) {
         this.send({ type: 'metrics', source: 'live', activeSignals: bundle.signals, data: frame });
       }
     });
 
     sdk.on('validationStatus', (code, _ts, hint) => {
-      if (hint) this.send({ type: 'validation', hint: String(hint) });
+      if (hint) {
+        console.log(`[pip] SDK validation: code=${code} hint="${String(hint)}"`);
+        this.send({ type: 'validation', hint: String(hint) });
+      }
     });
 
     sdk.on('error', (code, message, retryable) => {
@@ -155,6 +171,7 @@ class LiveSession {
       return false;
     }
 
+    console.log(`[pip] live session started — bundle: ${bundle.name}`);
     this.send({ type: 'status', state: 'measuring', activeSignals: bundle.signals, bundle: bundle.name });
     return true;
   }
@@ -186,10 +203,24 @@ class LiveSession {
     const height = buf.readUInt32LE(4);
     if (width < 16 || width > 1920 || height < 16 || height > 1080) return;
     const pixels = buf.subarray(8);
-    if (pixels.length < width * height * 4) return;
+    if (pixels.length < width * height * 3) return; // frames arrive packed as RGB
     const tsUs = Number(process.hrtime.bigint() / 1000n); // monotonic µs (per SDK docs)
     try {
-      this.sdk.sendFrame(pixels, width, height, width * 4, sdkModule.PixelFormat.kRGBA, tsUs);
+      const accepted = this.sdk.sendFrame(pixels, width, height, width * 3, sdkModule.PixelFormat.kRGB, tsUs);
+      this.framesFed += 1;
+      if (accepted === false) this.framesRejected += 1;
+      const nowMs = Date.now();
+      if (this.lastFpsLogAt && nowMs - this.lastFpsLogAt >= 5000) {
+        const fps = ((this.framesFed - this.lastFpsCount) / ((nowMs - this.lastFpsLogAt) / 1000)).toFixed(1);
+        console.log(
+          `[pip] frames fed: ${this.framesFed} (rejected: ${this.framesRejected}, ~${fps} fps), metrics received: ${this.gotMetrics}`,
+        );
+        this.lastFpsLogAt = nowMs;
+        this.lastFpsCount = this.framesFed;
+      } else if (!this.lastFpsLogAt) {
+        this.lastFpsLogAt = nowMs;
+        this.lastFpsCount = this.framesFed;
+      }
     } catch {
       // A frame racing a stop() is expected occasionally; drop it.
     }
@@ -230,7 +261,10 @@ const httpServer = http.createServer(async (req, res) => {
     const filePath = normalize(join(PUBLIC_DIR, rel));
     if (!filePath.startsWith(PUBLIC_DIR)) throw new Error('bad path');
     const body = await readFile(filePath);
-    res.writeHead(200, { 'content-type': MIME[extname(filePath)] ?? 'application/octet-stream' });
+    res.writeHead(200, {
+      'content-type': MIME[extname(filePath)] ?? 'application/octet-stream',
+      'cache-control': 'no-store', // the phone must never run a stale app.js after an update
+    });
     res.end(body);
   } catch {
     res.writeHead(404, { 'content-type': 'text/plain' });
