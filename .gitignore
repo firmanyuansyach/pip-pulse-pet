@@ -2,3 +2,6 @@ node_modules/
 .env
 *.log
 .DS_Store
+face-video.avi
+checkin-video.avi
+public/checkin-display.mp4
