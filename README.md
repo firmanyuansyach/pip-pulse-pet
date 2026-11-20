@@ -80,6 +80,23 @@ Expression changes are debounced (~0.5 s of persistence) so Pip doesn't flicker,
 
 ---
 
+## Two input modes: live camera and recorded check-in
+
+Everything above describes **live mode**: the camera streams, the SDK measures in real time. Pip also has a second, equally real input mode:
+
+**Recorded check-in.** Some devices cannot give the SDK what it needs live — a phone tethered as a webcam, for instance, may deliver frames in bursts, and the SDK's vitals refuse to lock below a steady ~25 fps. For those, Pip can measure a short face video you recorded beforehand, using the SDK's file input (`useFile()`). The recording runs through the *same* metric bundles, the same `decodeMetrics` → `lib/normalize.mjs` pipeline, and drives the same pet — only the frame source differs. The consent screen offers **Play a recorded check-in** whenever a file is available, and the page labels the whole session **RECORDED CHECK-IN REPLAY**; it is never presented as live. When the file ends, the page shows a "check-in complete" state with the final numbers.
+
+To supply a check-in recording, do any one of:
+
+- set `PIP_VIDEO_FILE` in `.env` to the file's path, or
+- drop the file next to `server.mjs` named **`checkin-video.avi`** (a `face-video.avi` in the same place is picked up as a fallback).
+
+**Format matters:** the SDK's Windows file reader is picky — in testing, an H.264 MP4 could not be opened at all, while an **MJPEG AVI** (480×854, 30 fps) opened and measured cleanly, so MJPEG AVI is the recommended encoding. Record about a minute, face and upper chest visible, still and well lit — the same guidance as live mode. If a browser-playable H.264 copy named `public/checkin-display.mp4` exists, the page plays it in the corner while the SDK measures the AVI, so you can watch what Pip sees.
+
+The check-in file is personal data: Pip only ever hands it to the SDK on this machine. It is never served over HTTP and never uploaded, and the repo ships without one — supply your own.
+
+> **About this project's demo:** the demo uses a real recorded check-in — the author's own 62-second recording — processed by the SDK in this mode (measured from it: pulse ≈ 87 bpm median, breathing ≈ 15 breaths/min dipping to ≈ 9/min in the calm segment, 45 expression readings), alongside live expression mirroring from a phone camera. No simulated signals appear anywhere in the demo; demo mode exists only so visitors without a key can explore.
+
 ## Privacy & data handling
 
 Pip was designed so the honest answer to "what do you keep?" is **nothing**.
