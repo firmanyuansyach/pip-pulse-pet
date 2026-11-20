@@ -56,6 +56,7 @@
       </svg>
     </div>
     <p id="mood-line" class="mood">Pip is waiting to meet your signals…</p>
+    <p id="complete-note" class="hint hidden">✅ Check-in complete — the recording has been fully measured. The numbers on the right are what the SDK read from it. Press Stop whenever you're ready.</p>
     <div class="calm-row">
       <label class="switch">
         <input type="checkbox" id="calm-toggle">
@@ -70,9 +71,11 @@
 
   <aside class="side">
     <section class="card" id="camera-card">
-      <h2>Your camera</h2>
+      <h2 id="camera-title">Your camera</h2>
       <video id="preview" autoplay playsinline muted></video>
+      <p id="replay-label" class="replay-label hidden">RECORDED CHECK-IN REPLAY</p>
       <p id="camera-note" class="note">The preview is only shown to you, on this device. Frames are measured in memory by the SmartSpectra SDK on this machine — nothing is recorded or uploaded by Pip.</p>
+      <p id="video-note" class="note hidden">This is a replay: the SmartSpectra SDK is measuring a video file recorded earlier, on this machine — not a live camera. The clip in the corner is the same recording, shown so you can see what Pip sees.</p>
       <p id="validation-hint" class="hint hidden"></p>
     </section>
 
@@ -115,6 +118,7 @@
     <p>Pip is a small toy with a camera for a heart. Please read this first — nothing is captured until you agree:</p>
     <ul>
       <li><strong>What happens:</strong> if you choose live mode, your webcam turns on and the Presage SmartSpectra SDK measures your pulse, breathing, and facial expressions from the video, on this machine, in real time.</li>
+      <li><strong>Recorded check-in:</strong> instead of a live camera, Pip can replay a short face video recorded earlier and measure that file with the same SDK, on this machine. The page labels it RECORDED CHECK-IN REPLAY the whole time — a replay is never presented as live.</li>
       <li><strong>Nothing is kept:</strong> Pip does not record video, does not take screenshots, and does not store your measurements. Close the tab or press Stop and everything is gone — there is nothing to delete later.</li>
       <li><strong>Where frames go:</strong> frames are processed in memory by the SDK on this computer. The SDK talks to Presage only to authenticate the API key. Pip's own server (also on this computer) adds no uploads of its own.</li>
       <li id="telemetry-line"><strong>SDK telemetry:</strong> checking the server setting…</li>
@@ -123,9 +127,11 @@
     </ul>
     <div class="gate-actions">
       <button id="consent-live" class="primary">I agree — turn on my camera</button>
+      <button id="consent-video" disabled>Play a recorded check-in (no camera — the SDK measures a video file)</button>
       <button id="consent-demo">Explore demo mode instead (no camera, simulated signals)</button>
     </div>
     <p id="live-unavailable" class="note hidden"></p>
+    <p id="video-unavailable" class="note hidden">Recorded check-in is not available on this server right now — it needs a check-in video file beside the server and the same free API key as live mode (see the README).</p>
   </div>
 </div>
 

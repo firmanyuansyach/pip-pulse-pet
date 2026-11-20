@@ -11,7 +11,8 @@ const pip = new Pip($('pip-svg'));
 
 const state = {
   ws: null,
-  mode: null, // 'live' | 'demo'
+  mode: null, // 'live' | 'demo' | 'video'
+  videoDisplay: false, // server has a browser-playable copy of the check-in
   stream: null,
   pumpTimer: null,
   latestFrame: null,
@@ -46,6 +47,8 @@ function connect() {
       showHint(msg.hint);
     } else if (msg.type === 'status' && msg.state === 'measuring') {
       onMeasuring(msg);
+    } else if (msg.type === 'status' && msg.state === 'video-ended') {
+      onVideoEnded();
     } else if (msg.type === 'error') {
       endSession(`Something stopped the measurement: ${msg.message}`);
     }
@@ -74,6 +77,13 @@ function onHello(msg) {
     note.textContent =
       'Live mode is not available on this server right now (no SmartSpectra API key configured, or the SDK failed to load). Demo mode below works completely — and live mode takes one free key from physiology.presagetech.com in a local .env file.';
     note.classList.remove('hidden');
+  }
+  state.videoDisplay = !!msg.videoDisplayAvailable;
+  if (msg.videoAvailable && msg.liveAvailable) {
+    $('consent-video').disabled = false;
+    $('video-unavailable').classList.add('hidden');
+  } else {
+    $('video-unavailable').classList.remove('hidden');
   }
 }
 
@@ -117,16 +127,53 @@ function startDemo() {
   send({ type: 'start', mode: 'demo' });
 }
 
+function startVideo() {
+  hideError();
+  state.mode = 'video';
+  $('consent-gate').classList.add('hidden');
+  $('scenario-card').classList.add('hidden');
+  $('camera-card').classList.remove('hidden');
+  $('camera-title').textContent = 'Your recorded check-in';
+  $('camera-note').classList.add('hidden');
+  $('video-note').classList.remove('hidden');
+  $('replay-label').classList.remove('hidden');
+  $('complete-note').classList.add('hidden');
+  $('stop-btn').disabled = false;
+  $('stop-btn').textContent = 'Stop the check-in replay';
+  const preview = $('preview');
+  preview.srcObject = null;
+  if (state.videoDisplay) {
+    // Approximate sync: the corner clip and the SDK's measurement of the
+    // same recording both start on this one click.
+    preview.muted = true;
+    preview.playsInline = true;
+    preview.src = 'checkin-display.mp4';
+    preview.play().catch(() => { /* a manual tap on the clip also plays it */ });
+  }
+  send({ type: 'start-video' });
+}
+
 function onMeasuring(msg) {
   const badge = $('source-badge');
-  badge.classList.remove('hidden', 'live', 'demo');
-  if (state.mode === 'demo') {
+  badge.classList.remove('hidden', 'live', 'demo', 'video');
+  if (state.mode === 'video') {
+    badge.textContent = 'RECORDED CHECK-IN REPLAY';
+    badge.classList.add('video');
+  } else if (state.mode === 'demo') {
     badge.textContent = 'DEMO MODE — SIMULATED SIGNALS';
     badge.classList.add('demo');
   } else {
     badge.textContent = `● LIVE — ${msg.bundle ?? 'SmartSpectra'}`;
     badge.classList.add('live');
   }
+}
+
+function onVideoEnded() {
+  const badge = $('source-badge');
+  badge.textContent = 'RECORDED CHECK-IN — COMPLETE';
+  $('complete-note').classList.remove('hidden');
+  const preview = $('preview');
+  if (preview.getAttribute('src')) preview.pause();
 }
 
 function startPump() {
@@ -184,7 +231,19 @@ function endSession(message) {
   if (state.mode) send({ type: 'stop' });
   state.mode = null;
   state.latestFrame = null;
-  $('preview').srcObject = null;
+  const preview = $('preview');
+  preview.srcObject = null;
+  if (preview.getAttribute('src')) {
+    preview.pause();
+    preview.removeAttribute('src');
+    preview.load();
+  }
+  $('camera-title').textContent = 'Your camera';
+  $('camera-note').classList.remove('hidden');
+  $('video-note').classList.add('hidden');
+  $('replay-label').classList.add('hidden');
+  $('complete-note').classList.add('hidden');
+  $('stop-btn').textContent = 'Stop & turn the camera off';
   $('stop-btn').disabled = true;
   $('source-badge').classList.add('hidden');
   $('scenario-card').classList.add('hidden');
@@ -261,6 +320,7 @@ function resetSignalCards() {
 // ---------------------------------------------------------------------------
 
 $('consent-live').addEventListener('click', startLive);
+$('consent-video').addEventListener('click', startVideo);
 $('consent-demo').addEventListener('click', startDemo);
 $('stop-btn').addEventListener('click', () => endSession());
 $('calm-toggle').addEventListener('change', (ev) => {
