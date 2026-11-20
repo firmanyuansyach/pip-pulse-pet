@@ -20,7 +20,7 @@ const state = {
 
 const FRAME_W = 640;
 const FRAME_H = 480;
-const FRAME_EVERY_MS = 66; // ~15 fps is plenty for vitals, kind to CPUs
+const FRAME_EVERY_MS = 33; // ~30 fps — the SDK refuses vitals below 25 fps (validation code=11)
 
 // ---------------------------------------------------------------------------
 // WebSocket
@@ -82,7 +82,9 @@ async function startLive() {
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: FRAME_W }, height: { ideal: FRAME_H }, facingMode: 'user' },
+      // No size ideals: let the camera deliver its natural mode/aspect
+      // (portrait on phones). The pump adapts to whatever arrives.
+      video: { facingMode: 'user' },
       audio: false,
     });
   } catch (err) {
@@ -91,6 +93,11 @@ async function startLive() {
   }
   state.stream = stream;
   state.mode = 'live';
+  // Keep the screen awake while measuring: a sleeping/dimmed screen
+  // throttles the frame pump and the SDK's fps verdict collapses.
+  try {
+    await navigator.wakeLock?.request('screen');
+  } catch { /* wake lock is best-effort */ }
   $('preview').srcObject = stream;
   $('consent-gate').classList.add('hidden');
   $('scenario-card').classList.add('hidden');
@@ -125,18 +132,44 @@ function onMeasuring(msg) {
 function startPump() {
   const video = $('preview');
   const canvas = document.createElement('canvas');
-  canvas.width = FRAME_W;
-  canvas.height = FRAME_H;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   state.pumpTimer = setInterval(() => {
     if (!state.stream || video.readyState < 2 || state.ws?.readyState !== WebSocket.OPEN) return;
-    ctx.drawImage(video, 0, 0, FRAME_W, FRAME_H);
-    const img = ctx.getImageData(0, 0, FRAME_W, FRAME_H);
-    const out = new ArrayBuffer(8 + img.data.length);
+    // Send frames in the camera's NATIVE aspect — never squash or crop.
+    // v1 squashed portrait phone frames into 640x480 landscape (the SDK's
+    // face detection never locked on); v2 cover-cropped to landscape (the
+    // SDK then reported the face sat too low in the frame, code=16 "Move
+    // up, or tilt the camera down", and every metrics buffer stayed
+    // empty). The SDK is built for natural phone frames: pass them
+    // through untouched, only downscaling so the long side is <= 480 px
+    // (keeps 30 fps sustainable over Wi-Fi: ~0.5 MB per frame).
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) return;
+    const scale = Math.min(1, 480 / Math.max(vw, vh));
+    const w = Math.max(16, Math.round((vw * scale) / 2) * 2);
+    const h = Math.max(16, Math.round((vh * scale) / 2) * 2);
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    ctx.drawImage(video, 0, 0, w, h);
+    const img = ctx.getImageData(0, 0, w, h);
+    // Pack RGB (3 bytes/px), not RGBA: 25% less Wi-Fi traffic at 30 fps,
+    // and it matches the SDK README's canonical custom-input format.
+    const px = w * h;
+    const out = new ArrayBuffer(8 + px * 3);
     const view = new DataView(out);
-    view.setUint32(0, FRAME_W, true);
-    view.setUint32(4, FRAME_H, true);
-    new Uint8Array(out, 8).set(img.data);
+    view.setUint32(0, w, true);
+    view.setUint32(4, h, true);
+    const body = new Uint8Array(out, 8);
+    const src = img.data;
+    for (let i = 0, j = 0; i < px; i++, j += 3) {
+      const s = i * 4;
+      body[j] = src[s];
+      body[j + 1] = src[s + 1];
+      body[j + 2] = src[s + 2];
+    }
     state.ws.send(out);
   }, FRAME_EVERY_MS);
 }
